@@ -295,13 +295,38 @@ const StarfieldCanvas = () => {
 // ─── Scene: Cinematic 3D Text ─────────────────────────────────────────────────
 // 🎬 FULL STOP VERSION — Text Benar-benar FREEZE!
 
+```tsx
 const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
   const [phase, setPhase] = useState<'comeback' | 'tome'>('comeback');
+  const [motionPhase, setMotionPhase] = useState<'fly' | 'freeze' | 'zoom'>('fly');
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('tome'), TO_ME_DELAY);
-    const t2 = setTimeout(onComplete, CINEMATIC_DURATION);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    // FLY IN → FREEZE
+    const t1 = setTimeout(() => {
+      setMotionPhase('freeze');
+    }, 2000);
+
+    // FREEZE → ZOOM OUT
+    const t2 = setTimeout(() => {
+      setMotionPhase('zoom');
+    }, 5500);
+
+    // SHOW TO ME
+    const t3 = setTimeout(() => {
+      setPhase('tome');
+    }, TO_ME_DELAY);
+
+    // COMPLETE
+    const t4 = setTimeout(() => {
+      onComplete();
+    }, CINEMATIC_DURATION);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
   }, [onComplete]);
 
   const textStyle: React.CSSProperties = {
@@ -322,253 +347,184 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
   };
 
   return (
-    <div className="fixed inset-0 overflow-hidden" style={{ background: '#00000d' }}>
+    <div className="fixed inset-0 overflow-hidden bg-black">
       <StarfieldCanvas />
 
-      <div className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse 70% 45% at 50% 50%, rgba(255,100,155,0.18) 0%, transparent 75%)',
-      }} />
-
-      {/* ═══════════════════════════════════════════════════════════════
-          COME BACK — WITH FULL STOP/FREEZE
-          
-          TIMELINE (6 detik total):
-          0.0s - 1.2s  : Fly in dari jauh
-          1.2s - 2.0s  : Approaching & settle
-          ★ 2.0s - 5.5s : FULL STOP — TEXT FREEZE DI POSISI INI ★
-          5.5s - 6.0s  : Zoom out smooth
-          ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="absolute inset-0 flex items-center justify-center px-10 sm:px-14"
-        style={{ 
-          perspective: '900px', 
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          perspective: '1200px',
           perspectiveOrigin: '50% 50%',
         }}
       >
         <AnimatePresence>
           {phase === 'comeback' && (
-            <>
-              {/* Main text — FULL STOP VERSION */}
-              <motion.div
-                key="comeback-main"
-                className="absolute text-center select-none pointer-events-none will-change-transform"
-                initial={{ 
-                  scale: 0.01, 
-                  opacity: 0,
-                  rotateX: 10,
-                  z: -2500,
-                }}
-                animate={{
-                  // 🎯 PERHATIKAN: banyak nilai 1.0 di tengah = FREEZE!
-                  scale: [
-                    0.01,  // Start: jauh banget
-                    0.4,   // Fly in
-                    0.75,  // Getting closer
-                    0.92,  // Almost there
-                    1.0,   // ★ FREEZE START
-                    1.0,   // ★ STILL FROZEN
-                    1.0,   // ★ STILL FROZEN
-                    1.0,   // ★ STILL FROZEN
-                    1.0,   // ★ STILL FROZEN
-                    1.0,   // ★ STILL FROZEN
-                    1.0,   // ★ FREEZE END
-                    1.8,   // Start zoom out
-                    7.5    // Fly away
-                  ],
-                  opacity: [
-                    0,     // Start invisible
-                    0.6,   // Fading in
-                    0.95,  // Almost full
-                    1,     // ★ FULL OPACITY START
-                    1,     // ★ HOLD
-                    1,     // ★ HOLD
-                    1,     // ★ HOLD  
-                    1,     // ★ HOLD
-                    1,     // ★ HOLD
-                    1,     // ★ HOLD
-                    1,     // ★ FULL OPACITY END
-                    0.8,   // Start fading
-                    0      // Gone
-                  ],
-                  rotateX: [
-                    10, 4, 1, 0,
-                    0, 0, 0, 0, 0, 0, 0,  // ★ FROZEN rotation
-                    -2, -12
-                  ],
-                  z: [
-                    -2500, -800, -200, -50,
-                    0, 0, 0, 0, 0, 0, 0,  // ★ FROZEN depth
-                    100, 2000
-                  ],
-                }}
-                exit={{ opacity: 0 }}
-                transition={{
-                  duration: TO_ME_DELAY / 1000, // 6 detik
-                  // 🎯 TIMES array - perhatikan banyak nilai di 0.33-0.92 (FREEZE zone)
-                  scale: { 
-                    ease: [0.16, 1, 0.3, 1],
-                    times: [
-                      0,      // 0.0s
-                      0.12,   // 0.7s - fly in
-                      0.24,   // 1.4s - approaching
-                      0.33,   // 2.0s - settle
-                      0.40,   // ★ 2.4s - FREEZE
-                      0.50,   // ★ 3.0s - FREEZE
-                      0.65,   // ★ 3.9s - FREEZE
-                      0.75,   // ★ 4.5s - FREEZE
-                      0.85,   // ★ 5.1s - FREEZE
-                      0.92,   // ★ 5.5s - FREEZE END
-                      0.94,   // 5.6s - zoom start
-                      0.97,   // 5.8s - zooming
-                      1.0     // 6.0s - gone
-                    ] 
-                  },
-                  opacity: { 
-                    times: [
-                      0, 0.12, 0.24, 0.33,
-                      0.40, 0.50, 0.65, 0.75, 0.85, 0.92, 0.94,
-                      0.97, 1.0
-                    ],
-                    ease: 'easeInOut',
-                  },
-                  rotateX: {
-                    ease: [0.16, 1, 0.3, 1],
-                    times: [
-                      0, 0.12, 0.24, 0.33,
-                      0.40, 0.50, 0.65, 0.75, 0.85, 0.92, 0.94,
-                      0.97, 1.0
-                    ]
-                  },
-                  z: {
-                    ease: [0.16, 1, 0.3, 1],
-                    times: [
-                      0, 0.12, 0.24, 0.33,
-                      0.40, 0.50, 0.65, 0.75, 0.85, 0.92, 0.94,
-                      0.97, 1.0
-                    ]
-                  }
-                }}
-                style={{ 
-                  transformStyle: 'preserve-3d',
-                }}
-              >
-                <div className="flex flex-col gap-2">
-                  {['COME', 'BACK'].map((word, i) => (
-                    <motion.div 
-                      key={i} 
-                      style={textStyle}
-                      initial={{ y: i * 35, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ 
-                        delay: 0.6 + i * 0.18,
-                        duration: 1.4,
-                        ease: [0.16, 1, 0.3, 1]
-                      }}
-                    >
-                      {word}
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
+            <motion.div
+              key="come-back"
+              className="absolute text-center"
+              initial={{
+                scale: 0.01,
+                opacity: 0,
+                rotateX: 10,
+                translateZ: -3000,
+              }}
+              animate={{
+                scale:
+                  motionPhase === 'fly'
+                    ? 1
+                    : motionPhase === 'freeze'
+                    ? 1
+                    : 7,
 
-              {/* Ghost glow layer */}
-              <motion.div
-                key="comeback-ghost"
-                className="absolute text-center select-none pointer-events-none will-change-transform"
-                initial={{ 
-                  scale: 0.008, 
-                  opacity: 0,
-                  rotateX: 13,
-                  z: -3000,
-                }}
-                animate={{
-                  scale: [
-                    0.008,
-                    0.35,
-                    0.68,
-                    0.85,
-                    0.92,  // FREEZE
-                    0.92,
-                    0.92,
-                    0.92,
-                    0.92,
-                    0.92,
-                    0.92,  // FREEZE END
-                    1.6,
-                    7.0
-                  ],
-                  opacity: [
-                    0, 0.35, 0.4, 0.38,
-                    0.35, 0.32, 0.3, 0.28, 0.26, 0.24, 0.22,
-                    0.15, 0
-                  ],
-                  rotateX: [
-                    13, 6, 2, 0,
-                    0, 0, 0, 0, 0, 0, 0,
-                    -4, -15
-                  ],
-                  z: [
-                    -3000, -900, -250, -80,
-                    -30, -30, -30, -30, -30, -30, -30,
-                    150, 2200
-                  ],
-                }}
-                exit={{ opacity: 0 }}
-                transition={{
-                  duration: TO_ME_DELAY / 1000,
-                  scale: { 
-                    ease: [0.16, 1, 0.3, 1],
-                    times: [
-                      0, 0.14, 0.26, 0.35,
-                      0.42, 0.52, 0.67, 0.77, 0.87, 0.93, 0.95,
-                      0.98, 1.0
-                    ] 
-                  },
-                  opacity: { 
-                    times: [
-                      0, 0.14, 0.26, 0.35,
-                      0.42, 0.52, 0.67, 0.77, 0.87, 0.93, 0.95,
-                      0.98, 1.0
-                    ],
-                  },
-                  rotateX: {
-                    ease: [0.16, 1, 0.3, 1],
-                    times: [
-                      0, 0.14, 0.26, 0.35,
-                      0.42, 0.52, 0.67, 0.77, 0.87, 0.93, 0.95,
-                      0.98, 1.0
-                    ]
-                  },
-                  z: {
-                    ease: [0.16, 1, 0.3, 1],
-                    times: [
-                      0, 0.14, 0.26, 0.35,
-                      0.42, 0.52, 0.67, 0.77, 0.87, 0.93, 0.95,
-                      0.98, 1.0
-                    ]
-                  },
-                  delay: 0.3,
-                }}
-                style={{ transformStyle: 'preserve-3d' }}
-              >
-                <div className="flex flex-col gap-2">
-                  {['COME', 'BACK'].map((word, i) => (
-                    <div key={i} style={{
-                      ...textStyle,
-                      color: 'rgba(255,133,161,0.3)',
-                      WebkitTextStroke: 'none',
-                      filter: 'blur(10px)',
-                      textShadow: '0 0 120px rgba(255,133,161,0.95)',
-                    }}>
-                      {word}
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </>
+                opacity:
+                  motionPhase === 'zoom'
+                    ? 0
+                    : 1,
+
+                rotateX:
+                  motionPhase === 'zoom'
+                    ? -12
+                    : 0,
+
+                translateZ:
+                  motionPhase === 'fly'
+                    ? 0
+                    : motionPhase === 'freeze'
+                    ? 0
+                    : 2500,
+              }}
+              transition={{
+                duration:
+                  motionPhase === 'fly'
+                    ? 2
+                    : motionPhase === 'freeze'
+                    ? 0
+                    : 1.3,
+
+                ease:
+                  motionPhase === 'freeze'
+                    ? 'linear'
+                    : [0.16, 1, 0.3, 1],
+              }}
+              style={{
+                transformStyle: 'preserve-3d',
+              }}
+            >
+              <div className="flex flex-col gap-2">
+                {['COME', 'BACK'].map((word, i) => (
+                  <motion.div
+                    key={i}
+                    style={textStyle}
+                    initial={{
+                      y: i * 35,
+                      opacity: 0,
+                    }}
+                    animate={{
+                      y: 0,
+                      opacity: 1,
+                    }}
+                    transition={{
+                      delay: 0.4 + i * 0.2,
+                      duration: 1.4,
+                      ease: [0.16, 1, 0.3, 1],
+                    }}
+                  >
+                    {word}
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {/* TO ME */}
+      <AnimatePresence>
+        {phase === 'tome' && (
+          <motion.div
+            key="tome"
+            className="absolute inset-0 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              duration: 2,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+          >
+            <div className="flex flex-col md:flex-row items-center gap-12">
+              <div className="text-center">
+                {['TO', 'ME'].map((word, i) => (
+                  <motion.div
+                    key={i}
+                    style={{
+                      ...textStyle,
+                      fontSize: 'clamp(60px, 15vw, 150px)',
+                    }}
+                    initial={{
+                      y: 60,
+                      opacity: 0,
+                      scale: 0.8,
+                    }}
+                    animate={{
+                      y: 0,
+                      opacity: 1,
+                      scale: 1,
+                    }}
+                    transition={{
+                      delay: i * 0.25,
+                      duration: 1.5,
+                      ease: [0.16, 1, 0.3, 1],
+                    }}
+                  >
+                    {word}
+                  </motion.div>
+                ))}
+              </div>
+
+              <motion.div
+                className="w-52 h-52"
+                initial={{
+                  scale: 0,
+                  opacity: 0,
+                  rotate: -40,
+                }}
+                animate={{
+                  scale: 1,
+                  opacity: 1,
+                  rotate: 0,
+                }}
+                transition={{
+                  delay: 1,
+                  type: 'spring',
+                  stiffness: 100,
+                  damping: 14,
+                }}
+              >
+                <CatSVG
+                  expression="happy"
+                  waving
+                  className="w-full h-full"
+                />
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Vignette */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(circle, transparent 45%, rgba(0,0,0,0.9) 100%)',
+        }}
+      />
+    </div>
+  );
+};
+```
+ </div>
 
       {/* ═══════════════════════════════════════════════════════════════
           TO ME — Muncul setelah COME BACK selesai
