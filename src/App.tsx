@@ -2,10 +2,21 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // ─── Timing Config ────────────────────────────────────────────────────────────
-// Seconds into the song when "come back" lyric hits — adjust if needed
-const COME_BACK_TIME = 17.8;
-// Auto-knock timestamps relative to audio start (seconds)
-const KNOCK_TIMES = [5.0, 7.5, 10.5];
+// ⚙️  TUNING GUIDE — ubah nilai di bawah kalau animasi belum pas sama lagu:
+//
+//  COME_BACK_TIME  → detik di lagu saat pintu terbuka (saat lirik "come back" hit)
+//                    Waveform: silence besar di 17.2s, jadi "come back" ~16.5s
+//
+//  KNOCK_TIMES     → detik-detik di lagu saat animasi TOK! muncul
+//                    Waveform onsets terdeteksi di 5.25, 6.00, 7.05
+//
+//  Di SceneCinematic:
+//    TOO_ME_DELAY  → berapa ms setelah scene mulai teks "TOO ME" muncul
+//                    "too me" di lagu ~17.5s, scene mulai 16.5s → gap ~1000ms
+
+const COME_BACK_TIME = 16.5;
+const KNOCK_TIMES = [5.25, 6.0, 7.05];
+const TOO_ME_DELAY = 1050; // ms setelah scene cinematic mulai
 
 // ─── Constants & Types ────────────────────────────────────────────────────────
 const PALETTE = {
@@ -298,8 +309,8 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
   const [phase, setPhase] = useState<'comeback' | 'tooyou'>('comeback');
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('tooyou'), 4000);
-    const t2 = setTimeout(onComplete, 8600);
+    const t1 = setTimeout(() => setPhase('tooyou'), TOO_ME_DELAY);
+    const t2 = setTimeout(onComplete, TOO_ME_DELAY + 4500);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [onComplete]);
 
@@ -335,12 +346,16 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
               key="comeback-main"
               className="absolute text-center select-none pointer-events-none"
               initial={{ scale: 0.008, opacity: 0 }}
-              animate={{ scale: [0.008, 0.9, 6.2], opacity: [0, 1, 1, 0] }}
+              animate={{
+                // fly in → land (readable) → hold → fly past camera
+                scale: [0.008, 0.82, 1.02, 0.98, 6.5],
+                opacity: [0, 1, 1, 1, 0],
+              }}
               exit={{ opacity: 0 }}
               transition={{
-                duration: 4.0,
-                scale: { ease: [0.38, 0, 1, 0.95], times: [0, 0.60, 1] },
-                opacity: { times: [0, 0.07, 0.70, 1], ease: 'easeInOut' },
+                duration: TOO_ME_DELAY / 1000,  // fills exactly the time before TOO ME
+                scale: { ease: 'easeInOut', times: [0, 0.45, 0.60, 0.72, 1.0] },
+                opacity: { times: [0, 0.08, 0.55, 0.75, 1.0], ease: 'easeInOut' },
               }}
             >
               {['COME', 'BACK'].map((word, i) => (
@@ -357,13 +372,16 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
               key="comeback-ghost"
               className="absolute text-center select-none pointer-events-none"
               initial={{ scale: 0.006, opacity: 0 }}
-              animate={{ scale: [0.006, 0.75, 5.5], opacity: [0, 0.3, 0.15, 0] }}
+              animate={{
+                scale: [0.006, 0.7, 0.88, 0.85, 5.5],
+                opacity: [0, 0.3, 0.2, 0.15, 0],
+              }}
               exit={{ opacity: 0 }}
               transition={{
-                duration: 4.0,
-                scale: { ease: [0.38, 0, 1, 0.95], times: [0, 0.63, 1] },
-                opacity: { times: [0, 0.15, 0.72, 1] },
-                delay: 0.28,
+                duration: TOO_ME_DELAY / 1000,
+                scale: { ease: 'easeInOut', times: [0, 0.48, 0.62, 0.74, 1.0] },
+                opacity: { times: [0, 0.18, 0.55, 0.75, 1.0] },
+                delay: 0.25,
               }}
             >
               {['COME', 'BACK'].map((word, i) => (
@@ -394,7 +412,7 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
             <div className="flex flex-row items-end gap-5">
               {/* Text */}
               <div className="text-center">
-                {['TOO', 'YOU'].map((word, i) => (
+                {['TOO', 'ME'].map((word, i) => (
                   <motion.div
                     key={i}
                     initial={{ y: 30, opacity: 0 }}
@@ -494,7 +512,7 @@ const SceneDoor = ({
       if (audio.currentTime >= COME_BACK_TIME && !hasOpened.current) {
         hasOpened.current = true;
         setIsOpen(true);
-        setTimeout(onOpen, 300);
+        setTimeout(onOpen, 200);
       }
     };
 
