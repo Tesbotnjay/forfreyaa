@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'motion/react';
 //    TOO_ME_DELAY  → berapa ms setelah scene mulai teks "TOO ME" muncul
 //                    "too me" di lagu ~17.5s, scene mulai 16.5s → gap ~1000ms
 
-const COME_BACK_TIME = 16.5;
+const COME_BACK_TIME = 20.5;
 const KNOCK_TIMES = [5.25, 6.0, 7.05];
 const TOO_ME_DELAY = 1050; // ms setelah scene cinematic mulai
 
