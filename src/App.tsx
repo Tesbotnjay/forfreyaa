@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'motion/react';
 // 6. Untuk "to me",itung jarak dari "come back" → update TOO_ME_DELAY
 
 const COME_BACK_TIME = 16.5;          // ⏱️ Detik saat lirik "come back" hit
-const KNOCK_TIMES = [5.25, 6.0, 7.05]; // ⏱️ Detik untuk animasi TOK TOK TOK
+const KNOCK_TIMES = [5.25, 6.0, 6.05]; // ⏱️ Detik untuk animasi TOK TOK TOK
 const TO_ME_DELAY = 1200;              // ⏱️ ms dari "come back" → "to me" muncul
 const CINEMATIC_DURATION = 5500;       // ⏱️ Total durasi scene cinematic (ms)
 
