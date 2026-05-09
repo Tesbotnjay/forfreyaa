@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // ─── ⚙️ TIMING CONFIG — TUNING ZONE ─────────────────────────────────────────
-const COME_BACK_TIME = 16.5;          // Detik saat pintu terbuka
-const KNOCK_TIMES = [5.25, 6.0, 7.05]; // Detik animasi TOK
-const TO_ME_DELAY = 3500;              // ⏱️ DIPERPANJANG: ms setelah pintu kebuka → "TO ME" muncul
-const CINEMATIC_DURATION = 8000;       // ⏱️ DIPERPANJANG: Total durasi scene (ms)
+const COME_BACK_TIME = 16.5;          
+const KNOCK_TIMES = [5.25, 6.0, 7.05]; 
+const TO_ME_DELAY = 6000;              // ⏱️ 6 DETIK - kasih waktu "COME BACK" freeze
+const CINEMATIC_DURATION = 10000;      // ⏱️ 10 DETIK - total durasi scene
 
 // ─── Constants & Types ────────────────────────────────────────────────────────
 const PALETTE = {
@@ -271,7 +271,6 @@ const StarfieldCanvas = () => {
 
         star.prevX = sx;
         star.prevY = sy;
-        // ⏱️ SLOWER SPEED: 18 → 12 untuk slow motion feel
         star.z -= 12;
 
         if (star.z <= 0) {
@@ -294,7 +293,7 @@ const StarfieldCanvas = () => {
 };
 
 // ─── Scene: Cinematic 3D Text ─────────────────────────────────────────────────
-// 🎬 ULTRA SLOW & READABLE VERSION
+// 🎬 FULL STOP VERSION — Text Benar-benar FREEZE!
 
 const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
   const [phase, setPhase] = useState<'comeback' | 'tome'>('comeback');
@@ -306,18 +305,18 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
   }, [onComplete]);
 
   const textStyle: React.CSSProperties = {
-    fontSize: 'clamp(48px, 13vw, 120px)',
+    fontSize: 'clamp(50px, 14vw, 130px)',
     fontWeight: 900,
     fontFamily: "'Georgia', 'Playfair Display', serif",
-    letterSpacing: '0.25em',
+    letterSpacing: '0.24em',
     color: 'transparent',
-    WebkitTextStroke: '2px rgba(255,170,200,0.95)',
+    WebkitTextStroke: '2.5px rgba(255,170,200,0.98)',
     textShadow: `
-      0 0 35px rgba(255,133,161,1),
-      0 0 85px rgba(255,133,161,0.75),
-      0 0 160px rgba(255,133,161,0.45)
+      0 0 40px rgba(255,133,161,1),
+      0 0 90px rgba(255,133,161,0.8),
+      0 0 170px rgba(255,133,161,0.5)
     `,
-    lineHeight: 1.15,
+    lineHeight: 1.12,
     display: 'block',
     whiteSpace: 'nowrap',
   };
@@ -326,64 +325,127 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#00000d' }}>
       <StarfieldCanvas />
 
-      {/* Center glow */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse 70% 45% at 50% 50%, rgba(255,100,155,0.15) 0%, transparent 75%)',
+        background: 'radial-gradient(ellipse 70% 45% at 50% 50%, rgba(255,100,155,0.18) 0%, transparent 75%)',
       }} />
 
       {/* ═══════════════════════════════════════════════════════════════
-          COME BACK — SLOW MOTION READABLE VERSION
+          COME BACK — WITH FULL STOP/FREEZE
+          
+          TIMELINE (6 detik total):
+          0.0s - 1.2s  : Fly in dari jauh
+          1.2s - 2.0s  : Approaching & settle
+          ★ 2.0s - 5.5s : FULL STOP — TEXT FREEZE DI POSISI INI ★
+          5.5s - 6.0s  : Zoom out smooth
           ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="absolute inset-0 flex items-center justify-center px-8 sm:px-12"
+        className="absolute inset-0 flex items-center justify-center px-10 sm:px-14"
         style={{ 
-          perspective: '800px', 
+          perspective: '900px', 
           perspectiveOrigin: '50% 50%',
         }}
       >
         <AnimatePresence>
           {phase === 'comeback' && (
             <>
-              {/* Main text — dengan HOLD yang panjang */}
+              {/* Main text — FULL STOP VERSION */}
               <motion.div
                 key="comeback-main"
                 className="absolute text-center select-none pointer-events-none will-change-transform"
                 initial={{ 
                   scale: 0.01, 
                   opacity: 0,
-                  rotateX: 12,
-                  z: -2000,
+                  rotateX: 10,
+                  z: -2500,
                 }}
                 animate={{
-                  // 🎬 SLOW TIMELINE:
-                  // 0-25%:    fly in dari jauh
-                  // 25-35%:   approach & settle
-                  // 35-70%:   HOLD READABLE (2.5+ detik bisa dibaca!)
-                  // 70-85%:   mulai zoom out
-                  // 85-100%:  fly past camera
-                  scale: [0.01, 0.5, 0.85, 0.95, 0.98, 0.98, 0.98, 1.0, 1.02, 6],
-                  opacity: [0, 0.8, 1, 1, 1, 1, 1, 1, 0.9, 0],
-                  rotateX: [12, 5, 1, 0, 0, 0, 0, 0, -3, -15],
-                  z: [-2000, -500, -100, 0, 0, 0, 0, 0, 50, 1500],
+                  // 🎯 PERHATIKAN: banyak nilai 1.0 di tengah = FREEZE!
+                  scale: [
+                    0.01,  // Start: jauh banget
+                    0.4,   // Fly in
+                    0.75,  // Getting closer
+                    0.92,  // Almost there
+                    1.0,   // ★ FREEZE START
+                    1.0,   // ★ STILL FROZEN
+                    1.0,   // ★ STILL FROZEN
+                    1.0,   // ★ STILL FROZEN
+                    1.0,   // ★ STILL FROZEN
+                    1.0,   // ★ STILL FROZEN
+                    1.0,   // ★ FREEZE END
+                    1.8,   // Start zoom out
+                    7.5    // Fly away
+                  ],
+                  opacity: [
+                    0,     // Start invisible
+                    0.6,   // Fading in
+                    0.95,  // Almost full
+                    1,     // ★ FULL OPACITY START
+                    1,     // ★ HOLD
+                    1,     // ★ HOLD
+                    1,     // ★ HOLD  
+                    1,     // ★ HOLD
+                    1,     // ★ HOLD
+                    1,     // ★ HOLD
+                    1,     // ★ FULL OPACITY END
+                    0.8,   // Start fading
+                    0      // Gone
+                  ],
+                  rotateX: [
+                    10, 4, 1, 0,
+                    0, 0, 0, 0, 0, 0, 0,  // ★ FROZEN rotation
+                    -2, -12
+                  ],
+                  z: [
+                    -2500, -800, -200, -50,
+                    0, 0, 0, 0, 0, 0, 0,  // ★ FROZEN depth
+                    100, 2000
+                  ],
                 }}
                 exit={{ opacity: 0 }}
                 transition={{
-                  duration: TO_ME_DELAY / 1000, // 3.5 detik
+                  duration: TO_ME_DELAY / 1000, // 6 detik
+                  // 🎯 TIMES array - perhatikan banyak nilai di 0.33-0.92 (FREEZE zone)
                   scale: { 
-                    ease: [0.16, 1, 0.3, 1], // Super smooth easing
-                    times: [0, 0.25, 0.35, 0.45, 0.5, 0.65, 0.7, 0.75, 0.85, 1.0] 
+                    ease: [0.16, 1, 0.3, 1],
+                    times: [
+                      0,      // 0.0s
+                      0.12,   // 0.7s - fly in
+                      0.24,   // 1.4s - approaching
+                      0.33,   // 2.0s - settle
+                      0.40,   // ★ 2.4s - FREEZE
+                      0.50,   // ★ 3.0s - FREEZE
+                      0.65,   // ★ 3.9s - FREEZE
+                      0.75,   // ★ 4.5s - FREEZE
+                      0.85,   // ★ 5.1s - FREEZE
+                      0.92,   // ★ 5.5s - FREEZE END
+                      0.94,   // 5.6s - zoom start
+                      0.97,   // 5.8s - zooming
+                      1.0     // 6.0s - gone
+                    ] 
                   },
                   opacity: { 
-                    times: [0, 0.15, 0.3, 0.4, 0.5, 0.65, 0.7, 0.8, 0.9, 1.0],
-                    ease: [0.16, 1, 0.3, 1],
+                    times: [
+                      0, 0.12, 0.24, 0.33,
+                      0.40, 0.50, 0.65, 0.75, 0.85, 0.92, 0.94,
+                      0.97, 1.0
+                    ],
+                    ease: 'easeInOut',
                   },
                   rotateX: {
                     ease: [0.16, 1, 0.3, 1],
-                    times: [0, 0.25, 0.35, 0.45, 0.5, 0.65, 0.7, 0.75, 0.85, 1.0]
+                    times: [
+                      0, 0.12, 0.24, 0.33,
+                      0.40, 0.50, 0.65, 0.75, 0.85, 0.92, 0.94,
+                      0.97, 1.0
+                    ]
                   },
                   z: {
                     ease: [0.16, 1, 0.3, 1],
-                    times: [0, 0.25, 0.35, 0.45, 0.5, 0.65, 0.7, 0.75, 0.85, 1.0]
+                    times: [
+                      0, 0.12, 0.24, 0.33,
+                      0.40, 0.50, 0.65, 0.75, 0.85, 0.92, 0.94,
+                      0.97, 1.0
+                    ]
                   }
                 }}
                 style={{ 
@@ -395,11 +457,11 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
                     <motion.div 
                       key={i} 
                       style={textStyle}
-                      initial={{ y: i * 30, opacity: 0 }}
+                      initial={{ y: i * 35, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
                       transition={{ 
-                        delay: i * 0.15,
-                        duration: 1.2,
+                        delay: 0.6 + i * 0.18,
+                        duration: 1.4,
                         ease: [0.16, 1, 0.3, 1]
                       }}
                     >
@@ -409,41 +471,83 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
                 </div>
               </motion.div>
 
-              {/* Ghost glow layer — delayed trailing */}
+              {/* Ghost glow layer */}
               <motion.div
                 key="comeback-ghost"
                 className="absolute text-center select-none pointer-events-none will-change-transform"
                 initial={{ 
                   scale: 0.008, 
                   opacity: 0,
-                  rotateX: 15,
-                  z: -2500,
+                  rotateX: 13,
+                  z: -3000,
                 }}
                 animate={{
-                  scale: [0.008, 0.45, 0.75, 0.85, 0.88, 0.88, 0.88, 0.9, 0.95, 5.5],
-                  opacity: [0, 0.4, 0.35, 0.3, 0.28, 0.25, 0.22, 0.2, 0.15, 0],
-                  rotateX: [15, 7, 2, 0, 0, 0, 0, 0, -5, -18],
-                  z: [-2500, -600, -150, -30, -20, -20, -20, 0, 80, 1700],
+                  scale: [
+                    0.008,
+                    0.35,
+                    0.68,
+                    0.85,
+                    0.92,  // FREEZE
+                    0.92,
+                    0.92,
+                    0.92,
+                    0.92,
+                    0.92,
+                    0.92,  // FREEZE END
+                    1.6,
+                    7.0
+                  ],
+                  opacity: [
+                    0, 0.35, 0.4, 0.38,
+                    0.35, 0.32, 0.3, 0.28, 0.26, 0.24, 0.22,
+                    0.15, 0
+                  ],
+                  rotateX: [
+                    13, 6, 2, 0,
+                    0, 0, 0, 0, 0, 0, 0,
+                    -4, -15
+                  ],
+                  z: [
+                    -3000, -900, -250, -80,
+                    -30, -30, -30, -30, -30, -30, -30,
+                    150, 2200
+                  ],
                 }}
                 exit={{ opacity: 0 }}
                 transition={{
                   duration: TO_ME_DELAY / 1000,
                   scale: { 
                     ease: [0.16, 1, 0.3, 1],
-                    times: [0, 0.28, 0.38, 0.48, 0.53, 0.67, 0.72, 0.77, 0.87, 1.0] 
+                    times: [
+                      0, 0.14, 0.26, 0.35,
+                      0.42, 0.52, 0.67, 0.77, 0.87, 0.93, 0.95,
+                      0.98, 1.0
+                    ] 
                   },
                   opacity: { 
-                    times: [0, 0.2, 0.35, 0.45, 0.55, 0.7, 0.75, 0.85, 0.92, 1.0],
+                    times: [
+                      0, 0.14, 0.26, 0.35,
+                      0.42, 0.52, 0.67, 0.77, 0.87, 0.93, 0.95,
+                      0.98, 1.0
+                    ],
                   },
                   rotateX: {
                     ease: [0.16, 1, 0.3, 1],
-                    times: [0, 0.28, 0.38, 0.48, 0.53, 0.67, 0.72, 0.77, 0.87, 1.0]
+                    times: [
+                      0, 0.14, 0.26, 0.35,
+                      0.42, 0.52, 0.67, 0.77, 0.87, 0.93, 0.95,
+                      0.98, 1.0
+                    ]
                   },
                   z: {
                     ease: [0.16, 1, 0.3, 1],
-                    times: [0, 0.28, 0.38, 0.48, 0.53, 0.67, 0.72, 0.77, 0.87, 1.0]
+                    times: [
+                      0, 0.14, 0.26, 0.35,
+                      0.42, 0.52, 0.67, 0.77, 0.87, 0.93, 0.95,
+                      0.98, 1.0
+                    ]
                   },
-                  delay: 0.25,
+                  delay: 0.3,
                 }}
                 style={{ transformStyle: 'preserve-3d' }}
               >
@@ -451,10 +555,10 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
                   {['COME', 'BACK'].map((word, i) => (
                     <div key={i} style={{
                       ...textStyle,
-                      color: 'rgba(255,133,161,0.28)',
+                      color: 'rgba(255,133,161,0.3)',
                       WebkitTextStroke: 'none',
-                      filter: 'blur(8px)',
-                      textShadow: '0 0 110px rgba(255,133,161,0.9)',
+                      filter: 'blur(10px)',
+                      textShadow: '0 0 120px rgba(255,133,161,0.95)',
                     }}>
                       {word}
                     </div>
@@ -467,22 +571,22 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          TO ME — Smooth Fade In
+          TO ME — Muncul setelah COME BACK selesai
           ═══════════════════════════════════════════════════════════════ */}
       <AnimatePresence>
         {phase === 'tome' && (
           <motion.div
             key="tome"
-            className="absolute inset-0 flex items-center justify-center px-6 py-8 sm:px-12"
+            className="absolute inset-0 flex items-center justify-center px-8 py-10 sm:px-14"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ 
-              duration: 2.2, 
+              duration: 2.4, 
               ease: [0.16, 1, 0.3, 1] 
             }}
           >
-            <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12 max-w-5xl w-full">
+            <div className="flex flex-col md:flex-row items-center justify-center gap-10 md:gap-14 max-w-5xl w-full">
               
               {/* Text "TO ME" */}
               <div className="text-center flex-shrink-0 order-1">
@@ -490,16 +594,16 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
                   {['TO', 'ME'].map((word, i) => (
                     <motion.div
                       key={i}
-                      initial={{ y: 60, opacity: 0, scale: 0.85 }}
+                      initial={{ y: 70, opacity: 0, scale: 0.82 }}
                       animate={{ y: 0, opacity: 1, scale: 1 }}
                       transition={{ 
-                        delay: i * 0.22 + 0.3, 
-                        duration: 1.6, 
+                        delay: i * 0.25 + 0.4, 
+                        duration: 1.8, 
                         ease: [0.16, 1, 0.3, 1] 
                       }}
                       style={{
                         ...textStyle,
-                        fontSize: 'clamp(52px, 14vw, 130px)',
+                        fontSize: 'clamp(56px, 15vw, 140px)',
                       }}
                     >
                       {word}
@@ -510,12 +614,12 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
 
               {/* Cat companion */}
               <motion.div
-                className="w-40 h-40 md:w-48 md:h-48 lg:w-52 lg:h-52 flex-shrink-0 order-2"
+                className="w-44 h-44 md:w-52 md:h-52 lg:w-56 lg:h-56 flex-shrink-0 order-2"
                 initial={{ 
                   scale: 0, 
                   opacity: 0, 
-                  rotate: -35,
-                  y: 30 
+                  rotate: -40,
+                  y: 35 
                 }}
                 animate={{ 
                   scale: 1, 
@@ -524,17 +628,17 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
                   y: 0 
                 }}
                 transition={{ 
-                  delay: 1.0, 
+                  delay: 1.2, 
                   type: 'spring', 
-                  stiffness: 100, 
-                  damping: 14,
-                  mass: 0.9,
+                  stiffness: 95, 
+                  damping: 15,
+                  mass: 1,
                 }}
               >
                 <CatSVG 
                   expression="happy" 
                   waving 
-                  className="w-full h-full filter drop-shadow-[0_12px_35px_rgba(255,133,161,0.35)]" 
+                  className="w-full h-full filter drop-shadow-[0_14px_40px_rgba(255,133,161,0.4)]" 
                 />
               </motion.div>
             </div>
@@ -544,14 +648,14 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
 
       {/* Vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse at center, transparent 35%, rgba(0,0,18,0.88) 100%)',
+        background: 'radial-gradient(ellipse at center, transparent 38%, rgba(0,0,20,0.9) 100%)',
       }} />
 
       {/* Film grain */}
       <div 
-        className="absolute inset-0 pointer-events-none opacity-[0.025]" 
+        className="absolute inset-0 pointer-events-none opacity-[0.028]" 
         style={{
-          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.5) 2px, rgba(255,255,255,0.5) 4px)',
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.55) 2px, rgba(255,255,255,0.55) 4px)',
           mixBlendMode: 'overlay',
         }} 
       />
