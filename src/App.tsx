@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // ─── ⚙️ TIMING CONFIG — TUNING ZONE ─────────────────────────────────────────
-const COME_BACK_TIME = 16.5;          
-const KNOCK_TIMES = [5.25, 6.0, 7.05]; 
-const TO_ME_DELAY = 6000;              // ⏱️ 6 DETIK untuk COME BACK sequence
-const CINEMATIC_DURATION = 10000;      // ⏱️ 10 DETIK total scene
+const COME_BACK_TIME = 16.5;           // ⏱️ Detik di lagu saat pintu terbuka
+const KNOCK_TIMES = [5.25, 6.0, 7.05]; // ⏱️ Ketukan pintu (dalam detik lagu)
+const TRAVEL_DELAY = 2200;             // ⏱️ Jeda "kamera terbang" sebelum COME BACK muncul (ms)
+const TO_ME_DELAY = 5500;              // ⏱️ Durasi phase COME BACK sebelum TO ME muncul (ms)
+const CINEMATIC_DURATION = 12000;      // ⏱️ Total durasi scene cinematic (ms) — harus > TRAVEL_DELAY + TO_ME_DELAY
 
 // ─── Constants & Types ────────────────────────────────────────────────────────
 const PALETTE = {
@@ -17,8 +18,6 @@ const PALETTE = {
   card: '#fffbfc',
 };
 
-type Scene = 'door' | 'cinematic' | 'intro' | 'letter' | 'game' | 'bloom' | 'final';
-
 // ─── SVG Components ───────────────────────────────────────────────────────────
 
 const CatSVG = ({
@@ -28,13 +27,6 @@ const CatSVG = ({
   standing = false,
   holdingBouquet = false,
   className = '',
-}: {
-  expression?: 'neutral' | 'happy' | 'shy' | 'shock' | 'sorry';
-  walking?: boolean;
-  waving?: boolean;
-  standing?: boolean;
-  holdingBouquet?: boolean;
-  className?: string;
 }) => {
   const [blink, setBlink] = useState(false);
   const [earTwitch, setEarTwitch] = useState(false);
@@ -174,7 +166,7 @@ const CatSVG = ({
   );
 };
 
-const BouquetSVG = ({ scale = 1, className = '' }: { scale?: number; className?: string }) => (
+const BouquetSVG = ({ scale = 1, className = '' }) => (
   <svg viewBox="0 0 100 130" className={`overflow-visible ${className}`} style={{ transform: `scale(${scale})` }}>
     <defs>
       <filter id="flowerGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -224,7 +216,7 @@ const BouquetSVG = ({ scale = 1, className = '' }: { scale?: number; className?:
 // ─── Starfield Canvas ─────────────────────────────────────────────────────────
 
 const StarfieldCanvas = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -245,7 +237,7 @@ const StarfieldCanvas = () => {
       prevY: 0,
     }));
 
-    let frame: number;
+    let frame;
 
     const render = () => {
       ctx.fillStyle = 'rgba(0,0,12,0.2)';
@@ -293,48 +285,25 @@ const StarfieldCanvas = () => {
 };
 
 // ─── Scene: Cinematic 3D Text ─────────────────────────────────────────────────
-// 🎬 FIXED: Camera moves first → then text appears → freeze → exit → TO ME
+// ✅ FIX: Tambah phase 'travel' di awal — starfield jalan dulu sebelum teks muncul
 
-const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
-  const [phase, setPhase] = useState<'camera' | 'approach' | 'freeze' | 'exit' | 'tome'>('camera');
-  const audioRef = useRef<HTMLAudioElement>(null);
+const SceneCinematic = ({ onComplete }) => {
+  // ✅ DIUBAH: phase awal = 'travel' (bukan 'comeback')
+  const [phase, setPhase] = useState('travel');
 
   useEffect(() => {
-    // Sequence timeline based on audio timing
-    const sequence = [
-      { time: 0.5, phase: 'camera' as const },      // Camera starts moving
-      { time: 2.5, phase: 'approach' as const },     // Text approach starts
-      { time: 3.5, phase: 'freeze' as const },       // Text freeze starts
-      { time: 5.5, phase: 'exit' as const },         // Text exit starts
-      { time: 6.0, phase: 'tome' as const },         // TO ME scene
-    ];
-
-    const checkPhase = () => {
-      const audio = audioRef.current;
-      if (!audio) return;
-      
-      const currentTime = audio.currentTime;
-      for (const step of sequence) {
-        if (currentTime >= step.time) {
-          setPhase(step.phase);
-        }
-      }
-    };
-
-    // Initial check + interval for sync
-    checkPhase();
-    const interval = setInterval(checkPhase, 50);
-    
-    // Auto-complete after CINEMATIC_DURATION
-    const completeTimer = setTimeout(onComplete, CINEMATIC_DURATION);
-    
-    return () => {
-      clearInterval(interval);
-      clearTimeout(completeTimer);
-    };
+    // ✅ DIUBAH: timeline 3 phase
+    // 0ms          → 'travel' (pure starfield, kamera terbang)
+    // TRAVEL_DELAY → 'comeback' (teks COME BACK muncul)
+    // TRAVEL_DELAY + TO_ME_DELAY → 'tome' (teks TO ME muncul)
+    // CINEMATIC_DURATION → onComplete (scene selesai)
+    const t0 = setTimeout(() => setPhase('comeback'), TRAVEL_DELAY);
+    const t1 = setTimeout(() => setPhase('tome'), TRAVEL_DELAY + TO_ME_DELAY);
+    const t2 = setTimeout(onComplete, CINEMATIC_DURATION);
+    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); };
   }, [onComplete]);
 
-  const textStyle: React.CSSProperties = {
+  const textStyle = {
     fontSize: 'clamp(50px, 14vw, 130px)',
     fontWeight: 900,
     fontFamily: "'Georgia', 'Playfair Display', serif",
@@ -351,207 +320,201 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
     whiteSpace: 'nowrap',
   };
 
-  // Animation configs
-  const cameraAnim = {
-    scale: [0.95, 1.02, 1.0],
-    opacity: [0.2, 1, 0.3],
-    rotateX: [8, 0, 2],
-  };
-
-  const textApproachAnim = {
-    scale: [0.01, 0.3, 0.65, 0.92],
-    opacity: [0, 0.5, 0.85, 1],
-    rotateX: [10, 4, 1, 0],
-    z: [-2500, -900, -250, -40],
-  };
-
-  const textFreezeAnim = {
-    scale: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-    opacity: [1, 1, 1, 1, 1, 1],
-    rotateX: [0, 0, 0, 0, 0, 0],
-    z: [0, 0, 0, 0, 0, 0],
-  };
-
-  const textExitAnim = {
-    scale: [1.0, 1.8, 7.5],
-    opacity: [1, 0.7, 0],
-    rotateX: [0, -3, -12],
-    z: [0, 150, 2500],
-  };
-
-  const ghostApproachAnim = {
-    scale: [0.008, 0.35, 0.68, 0.85],
-    opacity: [0, 0.35, 0.4, 0.38],
-    rotateX: [13, 6, 2, 0],
-    z: [-3000, -900, -250, -80],
-  };
-
-  const ghostFreezeAnim = {
-    scale: [0.92, 0.92, 0.92, 0.92, 0.92, 0.92],
-    opacity: [0.35, 0.32, 0.3, 0.28, 0.26, 0.24],
-    rotateX: [0, 0, 0, 0, 0, 0],
-    z: [-30, -30, -30, -30, -30, -30],
-  };
-
-  const ghostExitAnim = {
-    scale: [0.92, 1.6, 7.0],
-    opacity: [0.24, 0.15, 0],
-    rotateX: [0, -4, -15],
-    z: [-30, 150, 2200],
-  };
-
-  const transitionApproach = { duration: 1.2, ease: [0.16, 1, 0.3, 1] };
-  const transitionFreeze = { duration: 2.0, ease: "linear" }; // ← KEY: Linear = NO movement
-  const transitionExit = { duration: 0.8, ease: [0.16, 1, 0.3, 1] };
+  const approachEase = [0.16, 1, 0.3, 1];
+  const freezeTimes = [
+    0, 0.12, 0.24, 0.33,
+    0.40, 0.50, 0.65, 0.75, 0.85, 0.92,
+    0.94, 0.97, 1.0
+  ];
 
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#00000d' }}>
       <StarfieldCanvas />
+
       <div className="absolute inset-0 pointer-events-none" style={{
         background: 'radial-gradient(ellipse 70% 45% at 50% 50%, rgba(255,100,155,0.18) 0%, transparent 75%)',
       }} />
 
+      {/* ✅ 'travel' phase: starfield saja, tidak ada teks */}
+      <AnimatePresence>
+        {phase === 'travel' && (
+          <motion.div
+            key="travel-indicator"
+            className="absolute inset-0 flex items-end justify-center pb-16 pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            {/* Subtle warp lines at center untuk efek "kamera terbang" */}
+            <motion.div
+              className="absolute inset-0 flex items-center justify-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.4, 0.2, 0.5, 0] }}
+              transition={{ duration: TRAVEL_DELAY / 1000, ease: 'easeInOut' }}
+            >
+              <div style={{
+                width: '2px',
+                height: '120px',
+                background: 'linear-gradient(to bottom, transparent, rgba(255,133,161,0.6), transparent)',
+                filter: 'blur(2px)',
+                boxShadow: '0 0 30px rgba(255,133,161,0.4)',
+              }} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* COME BACK text — muncul setelah TRAVEL_DELAY */}
       <div
         className="absolute inset-0 flex items-center justify-center px-10 sm:px-14"
-        style={{ perspective: '900px', perspectiveOrigin: '50% 50%' }}
+        style={{
+          perspective: '900px',
+          perspectiveOrigin: '50% 50%',
+        }}
       >
         <AnimatePresence>
-          {phase === 'camera' && (
-            // ═══════════════════════════════════════════════════════════════
-            // FASE 1: KAMERA BERGERAK (0.5s - 2.5s)
-            // ═══════════════════════════════════════════════════════════════
-            <motion.div
-              key="camera-phase"
-              initial={{ scale: 0.95, opacity: 0.2, rotateX: 8 }}
-              animate={cameraAnim}
-              transition={{ duration: 2, ease: [0.19, 1, 0.22, 1] }}
-              className="absolute inset-0 flex items-center justify-center"
-              style={{ 
-                transformStyle: 'preserve-3d',
-                background: 'radial-gradient(circle at 50% 50%, rgba(255,170,200,0.08) 0%, transparent 70%)',
-              }}
-            >
-              {/* Placeholder - text belum muncul */}
-              <div className="text-center opacity-0">COME BACK</div>
-            </motion.div>
-          )}
+          {phase === 'comeback' && (
+            <>
+              <motion.div
+                key="comeback-main"
+                className="absolute text-center select-none pointer-events-none will-change-transform"
+                initial={{
+                  scale: 0.01,
+                  opacity: 0,
+                  rotateX: 10,
+                  z: -2500,
+                }}
+                animate={{
+                  scale: [
+                    0.01, 0.4, 0.75, 0.92,
+                    1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                    1.8, 7.5
+                  ],
+                  opacity: [
+                    0, 0.6, 0.95, 1,
+                    1, 1, 1, 1, 1, 1, 1,
+                    0.8, 0
+                  ],
+                  rotateX: [
+                    10, 4, 1, 0,
+                    0, 0, 0, 0, 0, 0, 0,
+                    -2, -12
+                  ],
+                  z: [
+                    -2500, -800, -200, -50,
+                    0, 0, 0, 0, 0, 0, 0,
+                    100, 2000
+                  ],
+                }}
+                exit={{ opacity: 0 }}
+                transition={{
+                  duration: TO_ME_DELAY / 1000,
+                  type: "tween",
+                  scale: { times: freezeTimes, ease: "linear" },
+                  opacity: { times: freezeTimes, ease: "linear" },
+                  rotateX: { times: freezeTimes, ease: "linear" },
+                  z: { times: freezeTimes, ease: "linear" }
+                }}
+                style={{ transformStyle: 'preserve-3d' }}
+              >
+                <div className="flex flex-col gap-2">
+                  {['COME', 'BACK'].map((word, i) => (
+                    <motion.div
+                      key={i}
+                      style={textStyle}
+                      initial={{ y: i * 35, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{
+                        delay: 0.6 + i * 0.18,
+                        duration: 1.4,
+                        ease: approachEase
+                      }}
+                    >
+                      {word}
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
 
-          {phase === 'approach' && (
-            // ═══════════════════════════════════════════════════════════════
-            // FASE 2: TEKS APPROACH (2.5s - 3.5s)
-            // ═══════════════════════════════════════════════════════════════
-            <motion.div
-              key="approach-phase"
-              initial={textApproachAnim}
-              animate={textApproachAnim}
-              transition={transitionApproach}
-              className="absolute text-center select-none pointer-events-none will-change-transform"
-              style={{ transformStyle: 'preserve-3d' }}
-            >
-              <div className="flex flex-col gap-2">
-                {['COME', 'BACK'].map((word, i) => (
-                  <motion.div 
-                    key={i} 
-                    style={textStyle}
-                    initial={{ y: i * 35, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.2 + i * 0.1, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                  >
-                    {word}
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {phase === 'freeze' && (
-            // ═══════════════════════════════════════════════════════════════
-            // FASE 3: TEKS FREEZE (3.5s - 5.5s) ★★★ BENAR-BENAR DIAM ★★★
-            // ═══════════════════════════════════════════════════════════════
-            <motion.div
-              key="freeze-phase"
-              initial={textFreezeAnim}
-              animate={textFreezeAnim}
-              transition={transitionFreeze}
-              className="absolute text-center select-none pointer-events-none will-change-transform"
-              style={{ transformStyle: 'preserve-3d' }}
-            >
-              <div className="flex flex-col gap-2">
-                {['COME', 'BACK'].map((word, i) => (
-                  <div key={i} style={textStyle}>{word}</div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {phase === 'exit' && (
-            // ═══════════════════════════════════════════════════════════════
-            // FASE 4: TEKS EXIT/ZOOM OUT (5.5s - 6.0s)
-            // ═══════════════════════════════════════════════════════════════
-            <motion.div
-              key="exit-phase"
-              initial={textExitAnim}
-              animate={textExitAnim}
-              transition={transitionExit}
-              className="absolute text-center select-none pointer-events-none will-change-transform"
-              style={{ transformStyle: 'preserve-3d' }}
-            >
-              <div className="flex flex-col gap-2">
-                {['COME', 'BACK'].map((word, i) => (
-                  <motion.div 
-                    key={i} 
-                    style={textStyle}
-                    animate={{ opacity: [1, 0.7, 0] }}
-                    transition={{ duration: 0.8 }}
-                  >
-                    {word}
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Ghost layer - follows same phases */}
-          {['approach', 'freeze', 'exit'].includes(phase) && (
-            <motion.div
-              key={`ghost-${phase}`}
-              initial={phase === 'approach' ? ghostApproachAnim : phase === 'freeze' ? ghostFreezeAnim : ghostExitAnim}
-              animate={phase === 'approach' ? ghostApproachAnim : phase === 'freeze' ? ghostFreezeAnim : ghostExitAnim}
-              transition={phase === 'approach' ? transitionApproach : phase === 'freeze' ? transitionFreeze : transitionExit}
-              className="absolute text-center select-none pointer-events-none will-change-transform"
-              style={{ 
-                transformStyle: 'preserve-3d',
-                color: 'rgba(255,133,161,0.3)',
-                WebkitTextStroke: 'none',
-                filter: 'blur(10px)',
-                textShadow: '0 0 120px rgba(255,133,161,0.95)',
-              }}
-            >
-              <div className="flex flex-col gap-2">
-                {['COME', 'BACK'].map((word, i) => (
-                  <div key={i} style={textStyle}>{word}</div>
-                ))}
-              </div>
-            </motion.div>
+              {/* Ghost glow layer */}
+              <motion.div
+                key="comeback-ghost"
+                className="absolute text-center select-none pointer-events-none will-change-transform"
+                initial={{
+                  scale: 0.008,
+                  opacity: 0,
+                  rotateX: 13,
+                  z: -3000,
+                }}
+                animate={{
+                  scale: [
+                    0.008, 0.35, 0.68, 0.85,
+                    0.92, 0.92, 0.92, 0.92, 0.92, 0.92, 0.92,
+                    1.6, 7.0
+                  ],
+                  opacity: [
+                    0, 0.35, 0.4, 0.38,
+                    0.35, 0.32, 0.3, 0.28, 0.26, 0.24, 0.22,
+                    0.15, 0
+                  ],
+                  rotateX: [
+                    13, 6, 2, 0,
+                    0, 0, 0, 0, 0, 0, 0,
+                    -4, -15
+                  ],
+                  z: [
+                    -3000, -900, -250, -80,
+                    -30, -30, -30, -30, -30, -30, -30,
+                    150, 2200
+                  ],
+                }}
+                exit={{ opacity: 0 }}
+                transition={{
+                  duration: TO_ME_DELAY / 1000,
+                  type: "tween",
+                  scale: { times: freezeTimes, ease: "linear" },
+                  opacity: { times: freezeTimes, ease: "linear" },
+                  rotateX: { times: freezeTimes, ease: "linear" },
+                  z: { times: freezeTimes, ease: "linear" },
+                  delay: 0.3,
+                }}
+                style={{ transformStyle: 'preserve-3d' }}
+              >
+                <div className="flex flex-col gap-2">
+                  {['COME', 'BACK'].map((word, i) => (
+                    <div key={i} style={{
+                      ...textStyle,
+                      color: 'rgba(255,133,161,0.3)',
+                      WebkitTextStroke: 'none',
+                      filter: 'blur(10px)',
+                      textShadow: '0 0 120px rgba(255,133,161,0.95)',
+                    }}>
+                      {word}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════
-          TO ME SCENE — Muncul setelah COME BACK selesai (6.0s+)
-          ═══════════════════════════════════════════════════════════════ */}
+      {/* TO ME — muncul setelah COME BACK selesai */}
       <AnimatePresence>
         {phase === 'tome' && (
           <motion.div
             key="tome"
+            className="absolute inset-0 flex items-center justify-center px-8 py-10 sm:px-14"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute inset-0 flex items-center justify-center px-8 py-10 sm:px-14"
+            transition={{
+              duration: 2.4,
+              ease: [0.16, 1, 0.3, 1]
+            }}
           >
             <div className="flex flex-col md:flex-row items-center justify-center gap-10 md:gap-14 max-w-5xl w-full">
-              {/* Text "TO ME" */}
               <div className="text-center flex-shrink-0 order-1">
                 <div className="flex flex-col gap-2">
                   {['TO', 'ME'].map((word, i) => (
@@ -559,12 +522,27 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
                       key={i}
                       initial={{ y: 70, opacity: 0, scale: 0.82 }}
                       animate={{ y: 0, opacity: 1, scale: 1 }}
-                      transition={{ 
-                        delay: i * 0.25 + 0.3, 
-                        duration: 1.5, 
-                        ease: [0.16, 1, 0.3, 1] 
+                      transition={{
+                        delay: i * 0.25 + 0.4,
+                        duration: 1.8,
+                        ease: [0.16, 1, 0.3, 1]
                       }}
-                      style={{ ...textStyle, fontSize: 'clamp(56px, 15vw, 140px)' }}
+                      style={{
+                        fontSize: 'clamp(56px, 15vw, 140px)',
+                        fontWeight: 900,
+                        fontFamily: "'Georgia', 'Playfair Display', serif",
+                        letterSpacing: '0.24em',
+                        color: 'transparent',
+                        WebkitTextStroke: '2.5px rgba(255,170,200,0.98)',
+                        textShadow: `
+                          0 0 40px rgba(255,133,161,1),
+                          0 0 90px rgba(255,133,161,0.8),
+                          0 0 170px rgba(255,133,161,0.5)
+                        `,
+                        lineHeight: 1.12,
+                        display: 'block',
+                        whiteSpace: 'nowrap',
+                      }}
                     >
                       {word}
                     </motion.div>
@@ -572,48 +550,66 @@ const SceneCinematic = ({ onComplete }: { onComplete: () => void }) => {
                 </div>
               </div>
 
-              {/* Cat companion */}
               <motion.div
                 className="w-44 h-44 md:w-52 md:h-52 lg:w-56 lg:h-56 flex-shrink-0 order-2"
-                initial={{ scale: 0, opacity: 0, rotate: -40, y: 35 }}
-                animate={{ scale: 1, opacity: 1, rotate: 0, y: 0 }}
-                transition={{ delay: 0.8, type: 'spring', stiffness: 95, damping: 15 }}
+                initial={{
+                  scale: 0,
+                  opacity: 0,
+                  rotate: -40,
+                  y: 35
+                }}
+                animate={{
+                  scale: 1,
+                  opacity: 1,
+                  rotate: 0,
+                  y: 0
+                }}
+                transition={{
+                  delay: 1.2,
+                  type: 'spring',
+                  stiffness: 95,
+                  damping: 15,
+                  mass: 1,
+                }}
               >
-                <CatSVG expression="happy" waving className="w-full h-full filter drop-shadow-[0_14px_40px_rgba(255,133,161,0.4)]" />
+                <CatSVG
+                  expression="happy"
+                  waving
+                  className="w-full h-full filter drop-shadow-[0_14px_40px_rgba(255,133,161,0.4)]"
+                />
               </motion.div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Vignette & Film grain */}
+      {/* Vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{
         background: 'radial-gradient(ellipse at center, transparent 38%, rgba(0,0,20,0.9) 100%)',
       }} />
-      <div className="absolute inset-0 pointer-events-none opacity-[0.028]" style={{
-        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.55) 2px, rgba(255,255,255,0.55) 4px)',
-        mixBlendMode: 'overlay',
-      }} />
+
+      {/* Film grain */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.028]"
+        style={{
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.55) 2px, rgba(255,255,255,0.55) 4px)',
+          mixBlendMode: 'overlay',
+        }}
+      />
     </div>
   );
 };
 
 // ─── Scene: Door ──────────────────────────────────────────────────────────────
 
-const SceneDoor = ({
-  onOpen,
-  audioRef,
-}: {
-  onOpen: () => void;
-  audioRef: React.RefObject<HTMLAudioElement>;
-}) => {
+const SceneDoor = ({ onOpen, audioRef }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [knocking, setKnocking] = useState(false);
   const [knockCount, setKnockCount] = useState(0);
   const [started, setStarted] = useState(false);
   const [listeningPulse, setListeningPulse] = useState(false);
   const hasOpened = useRef(false);
-  const knockTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const knockTimeouts = useRef([]);
 
   const triggerKnock = useCallback(() => {
     setKnocking(true);
@@ -669,8 +665,12 @@ const SceneDoor = ({
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-4 relative">
-      <div className="absolute bottom-0 left-0 right-0 h-52 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(255,210,220,0.35) 0%, transparent 75%)' }} />
+      <div
+        className="absolute bottom-0 left-0 right-0 h-52 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at 50% 100%, rgba(255,210,220,0.35) 0%, transparent 75%)'
+        }}
+      />
 
       <div className="relative w-64 h-96 [perspective:1200px]">
         <AnimatePresence>
@@ -698,20 +698,39 @@ const SceneDoor = ({
 
         <motion.div
           className="absolute inset-0 origin-left z-10"
-          animate={isOpen ? { rotateY: -115 } : knocking ? { x: [0, -5, 5, -3, 0] } : {}}
-          transition={isOpen ? { duration: 1.6, ease: [0.19, 1, 0.22, 1] } : { duration: 0.1 }}
+          animate={
+            isOpen
+              ? { rotateY: -115 }
+              : knocking
+              ? { x: [0, -5, 5, -3, 0] }
+              : {}
+          }
+          transition={
+            isOpen
+              ? { duration: 1.6, ease: [0.19, 1, 0.22, 1] }
+              : { duration: 0.1 }
+          }
           style={{ transformStyle: 'preserve-3d' }}
         >
           <div className="absolute inset-0 bg-[#7a3810] shadow-inner overflow-hidden rounded-sm">
-            <div className="absolute inset-0 opacity-12" style={{ background: 'repeating-linear-gradient(90deg, #6b3010 0px, #6b3010 5px, #894020 5px, #894020 10px)' }} />
+            <div
+              className="absolute inset-0 opacity-12"
+              style={{
+                background: 'repeating-linear-gradient(90deg, #6b3010 0px, #6b3010 5px, #894020 5px, #894020 10px)'
+              }}
+            />
             <div className="absolute top-8 left-4 right-4 h-32 border-4 border-[#5a2a0c] shadow-lg rounded-sm">
               <div className="w-full h-full bg-[#8b4513]/25" />
             </div>
             <div className="absolute bottom-8 left-4 right-4 h-48 border-4 border-[#5a2a0c] shadow-lg rounded-sm">
               <div className="w-full h-full bg-[#8b4513]/20" />
             </div>
-            <div className="absolute right-5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full shadow-xl"
-              style={{ background: 'radial-gradient(circle at 35% 35%, #ffd, #d4a017 50%, #8b6800)' }}>
+            <div
+              className="absolute right-5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full shadow-xl"
+              style={{
+                background: 'radial-gradient(circle at 35% 35%, #ffd, #d4a017 50%, #8b6800)'
+              }}
+            >
               <div className="absolute top-11 left-1/2 -translate-x-1/2 w-5 h-7 rounded-full bg-gradient-to-b from-[#d4a017] to-[#8b6800] opacity-55" />
             </div>
           </div>
@@ -737,7 +756,9 @@ const SceneDoor = ({
             whileTap={{ scale: 0.92 }}
             onClick={handleStart}
             className="px-14 py-5 bg-[#ff85a1] text-white font-black rounded-full text-xl tracking-wide uppercase"
-            style={{ boxShadow: '0 12px 45px rgba(255,133,161,0.5), 0 0 0 3px rgba(255,255,255,0.1)' }}
+            style={{
+              boxShadow: '0 12px 45px rgba(255,133,161,0.5), 0 0 0 3px rgba(255,255,255,0.1)'
+            }}
           >
             ♪ Mulai
           </motion.button>
@@ -748,12 +769,24 @@ const SceneDoor = ({
                 <motion.div
                   key={i}
                   className="w-3.5 h-3.5 rounded-full"
-                  style={{ background: knockCount > i ? '#ff85a1' : 'rgba(255,133,161,0.18)' }}
-                  animate={knockCount > i ? { scale: [1, 1.7, 1], boxShadow: ['0 0 0 rgba(255,133,161,0)', '0 0 20px rgba(255,133,161,0.8)', '0 0 0 rgba(255,133,161,0)'] } : {}}
+                  style={{
+                    background: knockCount > i
+                      ? '#ff85a1'
+                      : 'rgba(255,133,161,0.18)'
+                  }}
+                  animate={knockCount > i ? {
+                    scale: [1, 1.7, 1],
+                    boxShadow: [
+                      '0 0 0 rgba(255,133,161,0)',
+                      '0 0 20px rgba(255,133,161,0.8)',
+                      '0 0 0 rgba(255,133,161,0)',
+                    ]
+                  } : {}}
                   transition={{ duration: 0.4 }}
                 />
               ))}
             </div>
+
             {listeningPulse && !isOpen && (
               <motion.p
                 className="text-xs text-[#ffb3c6] font-black tracking-[0.3em] uppercase"
@@ -772,7 +805,7 @@ const SceneDoor = ({
 
 // ─── Scene: Intro ─────────────────────────────────────────────────────────────
 
-const SceneIntro = ({ onNext }: { onNext: () => void }) => {
+const SceneIntro = ({ onNext }) => {
   const [placed, setPlaced] = useState(false);
 
   useEffect(() => {
@@ -823,11 +856,11 @@ const SceneIntro = ({ onNext }: { onNext: () => void }) => {
 
 // ─── Scene: Letter ────────────────────────────────────────────────────────────
 
-const TypewriterText = ({ text, delay = 0, onComplete }: { text: string; delay?: number; onComplete?: () => void }) => {
+const TypewriterText = ({ text, delay = 0, onComplete }) => {
   const [displayedText, setDisplayedText] = useState('');
 
   useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout>;
+    let timeout;
     let index = 0;
     const startTyping = () => {
       if (index < text.length) {
@@ -845,9 +878,9 @@ const TypewriterText = ({ text, delay = 0, onComplete }: { text: string; delay?:
   return <span>{displayedText}</span>;
 };
 
-const SceneLetter = ({ onNext }: { onNext: () => void }) => {
+const SceneLetter = ({ onNext }) => {
   const [step, setStep] = useState(0);
-  const letterTargetRef = useRef<HTMLDivElement>(null);
+  const letterTargetRef = useRef(null);
 
   const lines = [
     'Aku tau ini mungkin ga bakal ngubah apa yang udah terjadi.',
@@ -913,15 +946,15 @@ const SceneLetter = ({ onNext }: { onNext: () => void }) => {
 
 // ─── Scene: Game ──────────────────────────────────────────────────────────────
 
-const SceneGame = ({ onNext }: { onNext: () => void }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+const SceneGame = ({ onNext }) => {
+  const containerRef = useRef(null);
+  const canvasRef = useRef(null);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(20);
-  const [gameState, setGameState] = useState<'ready' | 'playing' | 'end'>('ready');
+  const [gameState, setGameState] = useState('ready');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const petals = useRef<any[]>([]);
-  const particles = useRef<any[]>([]);
+  const petals = useRef([]);
+  const particles = useRef([]);
 
   const updateSize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -931,7 +964,11 @@ const SceneGame = ({ onNext }: { onNext: () => void }) => {
     }
   }, []);
 
-  useEffect(() => { updateSize(); window.addEventListener('resize', updateSize); return () => window.removeEventListener('resize', updateSize); }, [updateSize]);
+  useEffect(() => {
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, [updateSize]);
 
   useEffect(() => {
     if (gameState !== 'playing') return;
@@ -939,7 +976,7 @@ const SceneGame = ({ onNext }: { onNext: () => void }) => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    let frame: number;
+    let frame;
 
     const render = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -987,7 +1024,7 @@ const SceneGame = ({ onNext }: { onNext: () => void }) => {
     } else if (timeLeft === 0) setGameState('end');
   }, [gameState, timeLeft]);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect) setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   };
@@ -1045,8 +1082,8 @@ const SceneGame = ({ onNext }: { onNext: () => void }) => {
 
 // ─── Scene: Bloom ─────────────────────────────────────────────────────────────
 
-const SceneBloom = ({ onNext }: { onNext: () => void }) => {
-  const [bloomed, setBloomed] = useState<number[]>([]);
+const SceneBloom = ({ onNext }) => {
+  const [bloomed, setBloomed] = useState([]);
   const promises = ['Akan lebih mendengarmu', 'Menghargai setiap waktumu', 'Selalu ada di sisimu', 'Lebih jujur dan terbuka', 'Menyayangimu setiap hari'];
 
   return (
@@ -1098,16 +1135,16 @@ const SceneFinal = () => {
   const [noPos, setNoPos] = useState({ top: 50, left: 65 });
   const [noHoverCount, setNoHoverCount] = useState(0);
   const [loveLevel, setLoveLevel] = useState(85);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
+  const containerRef = useRef(null);
+  const canvasRef = useRef(null);
+  const btnRef = useRef(null);
 
-  const handleNoInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleNoInteraction = (e) => {
     if (!btnRef.current) return;
     const rect = btnRef.current.getBoundingClientRect();
-    let cx: number, cy: number;
+    let cx, cy;
     if ('touches' in e) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
-    else { cx = (e as React.MouseEvent).clientX; cy = (e as React.MouseEvent).clientY; }
+    else { cx = e.clientX; cy = e.clientY; }
     const dist = Math.hypot(cx - (rect.left + rect.width / 2), cy - (rect.top + rect.height / 2));
     if (dist < 100) {
       setNoHoverCount(p => { const n = p + 1; setLoveLevel(Math.max(10, 85 - n * 5)); return n; });
@@ -1118,7 +1155,7 @@ const SceneFinal = () => {
   useEffect(() => {
     if (!yesClicked || !canvasRef.current) return;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     const ps = Array.from({ length: 150 }, () => ({
@@ -1126,7 +1163,7 @@ const SceneFinal = () => {
       size: Math.random() * 6 + 2, speed: Math.random() * 3 + 1,
       color: `hsla(${Math.random() * 20 + 340},100%,75%,${Math.random()})`,
     }));
-    let req: number;
+    let req;
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ps.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill(); p.y -= p.speed; if (p.y < -10) p.y = canvas.height + 10; });
@@ -1248,8 +1285,8 @@ const ParticleBackground = () => (
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [scene, setScene] = useState<Scene>('door');
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [scene, setScene] = useState('door');
+  const audioRef = useRef(null);
 
   const renderScene = () => {
     switch (scene) {
@@ -1280,10 +1317,19 @@ export default function App() {
         <AnimatePresence mode="wait">
           <motion.div
             key={scene}
-            initial={scene === 'cinematic' ? { opacity: 0 } : { opacity: 0, scale: 0.98, filter: 'blur(10px)' }}
-            animate={scene === 'cinematic' ? { opacity: 1 } : { opacity: 1, scale: 1, filter: 'blur(0px)' }}
-            exit={scene === 'cinematic' ? { opacity: 0 } : { opacity: 0, scale: 1.02, filter: 'blur(10px)' }}
-            transition={{ duration: scene === 'cinematic' ? 0.5 : 0.9, ease: [0.19, 1, 0.22, 1] }}
+            initial={scene === 'cinematic'
+              ? { opacity: 0 }
+              : { opacity: 0, scale: 0.98, filter: 'blur(10px)' }}
+            animate={scene === 'cinematic'
+              ? { opacity: 1 }
+              : { opacity: 1, scale: 1, filter: 'blur(0px)' }}
+            exit={scene === 'cinematic'
+              ? { opacity: 0 }
+              : { opacity: 0, scale: 1.02, filter: 'blur(10px)' }}
+            transition={{
+              duration: scene === 'cinematic' ? 0.5 : 0.9,
+              ease: [0.19, 1, 0.22, 1]
+            }}
             className="absolute inset-0"
           >
             {renderScene()}
