@@ -4,9 +4,12 @@ import { motion, AnimatePresence } from 'motion/react';
 // ─── ⚙️ TIMING CONFIG — TUNING ZONE ─────────────────────────────────────────
 const COME_BACK_TIME = 16.5;           // ⏱️ Detik di lagu saat pintu terbuka
 const KNOCK_TIMES = [5.25, 6.0, 7.05]; // ⏱️ Ketukan pintu (dalam detik lagu)
-const TRAVEL_DELAY = 2200;             // ⏱️ Jeda "kamera terbang" sebelum COME BACK muncul (ms)
-const TO_ME_DELAY = 5500;              // ⏱️ Durasi phase COME BACK sebelum TO ME muncul (ms)
-const CINEMATIC_DURATION = 12000;      // ⏱️ Total durasi scene cinematic (ms) — harus > TRAVEL_DELAY + TO_ME_DELAY
+const TRAVEL_DELAY = 300;              // ⏱️ Jeda minimal sebelum COME BACK muncul (ms)
+const COMEBACK_STAY = 2500;            // ⏱️ COME BACK tetap di layar — pas sama lirik (ms)
+const COMEBACK_FADEOUT = 800;          // ⏱️ Fade out COME BACK (ms)
+const TOME_FADEIN_AFTER = TRAVEL_DELAY + COMEBACK_STAY; // ⏱️ TO ME muncul langsung setelah COME BACK
+const TOME_STAY = 5000;                // ⏱️ TO ME tetap di layar (ms)
+const CINEMATIC_DURATION = TOME_FADEIN_AFTER + TOME_STAY + 1500; // ⏱️ Total durasi cinematic
 
 // ─── Constants & Types ────────────────────────────────────────────────────────
 const PALETTE = {
@@ -285,47 +288,41 @@ const StarfieldCanvas = () => {
 };
 
 // ─── Scene: Cinematic 3D Text ─────────────────────────────────────────────────
-// ✅ FIX: Tambah phase 'travel' di awal — starfield jalan dulu sebelum teks muncul
 
 const SceneCinematic = ({ onComplete }) => {
-  // ✅ DIUBAH: phase awal = 'travel' (bukan 'comeback')
-  const [phase, setPhase] = useState('travel');
+  const [showComeback, setShowComeback] = useState(false);
+  const [showTome, setShowTome] = useState(false);
 
   useEffect(() => {
-    // ✅ DIUBAH: timeline 3 phase
-    // 0ms          → 'travel' (pure starfield, kamera terbang)
-    // TRAVEL_DELAY → 'comeback' (teks COME BACK muncul)
-    // TRAVEL_DELAY + TO_ME_DELAY → 'tome' (teks TO ME muncul)
-    // CINEMATIC_DURATION → onComplete (scene selesai)
-    const t0 = setTimeout(() => setPhase('comeback'), TRAVEL_DELAY);
-    const t1 = setTimeout(() => setPhase('tome'), TRAVEL_DELAY + TO_ME_DELAY);
+    // Timeline:
+    // 0ms              → starfield only
+    // TRAVEL_DELAY     → COME BACK fade in
+    // TOME_FADEIN_AFTER → COME BACK fades out + TO ME fades in
+    // CINEMATIC_DURATION → scene ends
+    const t0 = setTimeout(() => setShowComeback(true), TRAVEL_DELAY);
+    const t1 = setTimeout(() => {
+      setShowComeback(false);
+      setShowTome(true);
+    }, TOME_FADEIN_AFTER);
     const t2 = setTimeout(onComplete, CINEMATIC_DURATION);
     return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); };
   }, [onComplete]);
 
-  const textStyle = {
-    fontSize: 'clamp(50px, 14vw, 130px)',
+  const glowText = {
+    fontSize: 'clamp(52px, 14vw, 130px)',
     fontWeight: 900,
     fontFamily: "'Georgia', 'Playfair Display', serif",
-    letterSpacing: '0.24em',
-    color: 'transparent',
-    WebkitTextStroke: '2.5px rgba(255,170,200,0.98)',
+    letterSpacing: '0.22em',
+    color: '#ffb3d0',
     textShadow: `
-      0 0 40px rgba(255,133,161,1),
-      0 0 90px rgba(255,133,161,0.8),
-      0 0 170px rgba(255,133,161,0.5)
+      0 0 30px rgba(255,133,161,0.9),
+      0 0 80px rgba(255,133,161,0.6),
+      0 0 150px rgba(255,133,161,0.4),
+      0 2px 4px rgba(0,0,0,0.3)
     `,
-    lineHeight: 1.12,
-    display: 'block',
-    whiteSpace: 'nowrap',
+    lineHeight: 1.15,
+    whiteSpace: 'nowrap' as const,
   };
-
-  const approachEase = [0.16, 1, 0.3, 1];
-  const freezeTimes = [
-    0, 0.12, 0.24, 0.33,
-    0.40, 0.50, 0.65, 0.75, 0.85, 0.92,
-    0.94, 0.97, 1.0
-  ];
 
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#00000d' }}>
@@ -335,214 +332,74 @@ const SceneCinematic = ({ onComplete }) => {
         background: 'radial-gradient(ellipse 70% 45% at 50% 50%, rgba(255,100,155,0.18) 0%, transparent 75%)',
       }} />
 
-      {/* ✅ 'travel' phase: starfield saja, tidak ada teks */}
-      <AnimatePresence>
-        {phase === 'travel' && (
-          <motion.div
-            key="travel-indicator"
-            className="absolute inset-0 flex items-end justify-center pb-16 pointer-events-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            {/* Subtle warp lines at center untuk efek "kamera terbang" */}
-            <motion.div
-              className="absolute inset-0 flex items-center justify-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0.4, 0.2, 0.5, 0] }}
-              transition={{ duration: TRAVEL_DELAY / 1000, ease: 'easeInOut' }}
-            >
-              <div style={{
-                width: '2px',
-                height: '120px',
-                background: 'linear-gradient(to bottom, transparent, rgba(255,133,161,0.6), transparent)',
-                filter: 'blur(2px)',
-                boxShadow: '0 0 30px rgba(255,133,161,0.4)',
-              }} />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* COME BACK text — muncul setelah TRAVEL_DELAY */}
-      <div
-        className="absolute inset-0 flex items-center justify-center px-10 sm:px-14"
-        style={{
-          perspective: '900px',
-          perspectiveOrigin: '50% 50%',
-        }}
-      >
+      {/* COME BACK — fades in, stays, fades out */}
+      <div className="absolute inset-0 flex items-center justify-center">
         <AnimatePresence>
-          {phase === 'comeback' && (
-            <>
+          {showComeback && (
+            <motion.div
+              key="comeback"
+              className="text-center select-none pointer-events-none"
+              initial={{ opacity: 0, scale: 0.7, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 1.15, y: -20 }}
+              transition={{
+                enter: { duration: 1.2, ease: [0.16, 1, 0.3, 1] },
+                exit: { duration: COMEBACK_FADEOUT / 1000, ease: 'easeInOut' },
+              }}
+            >
+              <div className="flex flex-col items-center gap-1">
+                {['COME', 'BACK'].map((word, i) => (
+                  <motion.div
+                    key={i}
+                    style={glowText}
+                    initial={{ y: 40, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: i * 0.2, duration: 1, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    {word}
+                  </motion.div>
+                ))}
+              </div>
+              {/* Glow behind text */}
               <motion.div
-                key="comeback-main"
-                className="absolute text-center select-none pointer-events-none will-change-transform"
-                initial={{
-                  scale: 0.01,
-                  opacity: 0,
-                  rotateX: 10,
-                  z: -2500,
+                className="absolute inset-0 -z-10"
+                style={{
+                  background: 'radial-gradient(ellipse at center, rgba(255,133,161,0.25) 0%, transparent 70%)',
+                  filter: 'blur(30px)',
                 }}
-                animate={{
-                  scale: [
-                    0.01, 0.4, 0.75, 0.92,
-                    1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                    1.8, 7.5
-                  ],
-                  opacity: [
-                    0, 0.6, 0.95, 1,
-                    1, 1, 1, 1, 1, 1, 1,
-                    0.8, 0
-                  ],
-                  rotateX: [
-                    10, 4, 1, 0,
-                    0, 0, 0, 0, 0, 0, 0,
-                    -2, -12
-                  ],
-                  z: [
-                    -2500, -800, -200, -50,
-                    0, 0, 0, 0, 0, 0, 0,
-                    100, 2000
-                  ],
-                }}
-                exit={{ opacity: 0 }}
-                transition={{
-                  duration: TO_ME_DELAY / 1000,
-                  type: "tween",
-                  scale: { times: freezeTimes, ease: "linear" },
-                  opacity: { times: freezeTimes, ease: "linear" },
-                  rotateX: { times: freezeTimes, ease: "linear" },
-                  z: { times: freezeTimes, ease: "linear" }
-                }}
-                style={{ transformStyle: 'preserve-3d' }}
-              >
-                <div className="flex flex-col gap-2">
-                  {['COME', 'BACK'].map((word, i) => (
-                    <motion.div
-                      key={i}
-                      style={textStyle}
-                      initial={{ y: i * 35, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{
-                        delay: 0.6 + i * 0.18,
-                        duration: 1.4,
-                        ease: approachEase
-                      }}
-                    >
-                      {word}
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-
-              {/* Ghost glow layer */}
-              <motion.div
-                key="comeback-ghost"
-                className="absolute text-center select-none pointer-events-none will-change-transform"
-                initial={{
-                  scale: 0.008,
-                  opacity: 0,
-                  rotateX: 13,
-                  z: -3000,
-                }}
-                animate={{
-                  scale: [
-                    0.008, 0.35, 0.68, 0.85,
-                    0.92, 0.92, 0.92, 0.92, 0.92, 0.92, 0.92,
-                    1.6, 7.0
-                  ],
-                  opacity: [
-                    0, 0.35, 0.4, 0.38,
-                    0.35, 0.32, 0.3, 0.28, 0.26, 0.24, 0.22,
-                    0.15, 0
-                  ],
-                  rotateX: [
-                    13, 6, 2, 0,
-                    0, 0, 0, 0, 0, 0, 0,
-                    -4, -15
-                  ],
-                  z: [
-                    -3000, -900, -250, -80,
-                    -30, -30, -30, -30, -30, -30, -30,
-                    150, 2200
-                  ],
-                }}
-                exit={{ opacity: 0 }}
-                transition={{
-                  duration: TO_ME_DELAY / 1000,
-                  type: "tween",
-                  scale: { times: freezeTimes, ease: "linear" },
-                  opacity: { times: freezeTimes, ease: "linear" },
-                  rotateX: { times: freezeTimes, ease: "linear" },
-                  z: { times: freezeTimes, ease: "linear" },
-                  delay: 0.3,
-                }}
-                style={{ transformStyle: 'preserve-3d' }}
-              >
-                <div className="flex flex-col gap-2">
-                  {['COME', 'BACK'].map((word, i) => (
-                    <div key={i} style={{
-                      ...textStyle,
-                      color: 'rgba(255,133,161,0.3)',
-                      WebkitTextStroke: 'none',
-                      filter: 'blur(10px)',
-                      textShadow: '0 0 120px rgba(255,133,161,0.95)',
-                    }}>
-                      {word}
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </>
+                animate={{ scale: [1, 1.1, 1], opacity: [0.6, 1, 0.6] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* TO ME — muncul setelah COME BACK selesai */}
+      {/* TO ME — fades in right after COME BACK fades out */}
       <AnimatePresence>
-        {phase === 'tome' && (
+        {showTome && (
           <motion.div
             key="tome"
             className="absolute inset-0 flex items-center justify-center px-8 py-10 sm:px-14"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{
-              duration: 2.4,
-              ease: [0.16, 1, 0.3, 1]
-            }}
+            transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
           >
             <div className="flex flex-col md:flex-row items-center justify-center gap-10 md:gap-14 max-w-5xl w-full">
               <div className="text-center flex-shrink-0 order-1">
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col items-center gap-1">
                   {['TO', 'ME'].map((word, i) => (
                     <motion.div
                       key={i}
-                      initial={{ y: 70, opacity: 0, scale: 0.82 }}
+                      initial={{ y: 50, opacity: 0, scale: 0.85 }}
                       animate={{ y: 0, opacity: 1, scale: 1 }}
                       transition={{
-                        delay: i * 0.25 + 0.4,
-                        duration: 1.8,
+                        delay: i * 0.25 + 0.3,
+                        duration: 1.4,
                         ease: [0.16, 1, 0.3, 1]
                       }}
-                      style={{
-                        fontSize: 'clamp(56px, 15vw, 140px)',
-                        fontWeight: 900,
-                        fontFamily: "'Georgia', 'Playfair Display', serif",
-                        letterSpacing: '0.24em',
-                        color: 'transparent',
-                        WebkitTextStroke: '2.5px rgba(255,170,200,0.98)',
-                        textShadow: `
-                          0 0 40px rgba(255,133,161,1),
-                          0 0 90px rgba(255,133,161,0.8),
-                          0 0 170px rgba(255,133,161,0.5)
-                        `,
-                        lineHeight: 1.12,
-                        display: 'block',
-                        whiteSpace: 'nowrap',
-                      }}
+                      style={glowText}
                     >
                       {word}
                     </motion.div>
@@ -552,25 +409,9 @@ const SceneCinematic = ({ onComplete }) => {
 
               <motion.div
                 className="w-44 h-44 md:w-52 md:h-52 lg:w-56 lg:h-56 flex-shrink-0 order-2"
-                initial={{
-                  scale: 0,
-                  opacity: 0,
-                  rotate: -40,
-                  y: 35
-                }}
-                animate={{
-                  scale: 1,
-                  opacity: 1,
-                  rotate: 0,
-                  y: 0
-                }}
-                transition={{
-                  delay: 1.2,
-                  type: 'spring',
-                  stiffness: 95,
-                  damping: 15,
-                  mass: 1,
-                }}
+                initial={{ scale: 0, opacity: 0, rotate: -40, y: 35 }}
+                animate={{ scale: 1, opacity: 1, rotate: 0, y: 0 }}
+                transition={{ delay: 1.0, type: 'spring', stiffness: 95, damping: 15, mass: 1 }}
               >
                 <CatSVG
                   expression="happy"
